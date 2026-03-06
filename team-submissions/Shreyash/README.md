@@ -193,10 +193,9 @@ project/
 
 # Installation
 
-Clone the repository:
+Clone the repository, then:
 
 ```
-git clone https://github.com/yourusername/ai-resume-analyzer.git
 cd ai-resume-analyzer
 ```
 
