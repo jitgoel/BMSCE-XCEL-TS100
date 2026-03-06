@@ -1,0 +1,56 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+*.json
+# virtual environments
+venv/
+env/
+.venv/
+
+# environment variables
+.env
+
+# logs
+*.log
+
+# build files
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ML artifacts
+models/
+checkpoints/
+*.pt
+*.pth
+*.h5
+*.pkl
+*.joblib
+
+# vector databases
+chroma/
+faiss_index/
+vectordb/
+
+# uploaded files
+uploads/
+temp/
+tmp/
+
+# PDF / resume storage
+resumes/
+processed_resumes/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
