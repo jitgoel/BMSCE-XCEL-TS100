@@ -7,6 +7,7 @@ Analyzes code for bugs, security vulnerabilities, performance issues, and teache
 import sys
 import os
 import time
+from datetime import datetime
 import streamlit as st
 
 # Add project root to path
@@ -14,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from code_analyzer import CodeAnalyzer
 from review_engine import CodeReviewEngine
+from db import save_review, get_all_reviews, clear_history, get_stats, save_setting, get_setting
 from utils import (
     SUPPORTED_LANGUAGES,
     SEVERITY_EMOJI,
@@ -34,6 +36,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─── Session State Init ─────────────────────────────────────────────────────
+# Review history is now stored in SQLite (db.py) — persists across restarts
 
 # ─── Custom CSS ──────────────────────────────────────────────────────────────
 
@@ -325,12 +330,17 @@ with st.sidebar:
 
     # API Key input
     st.markdown("### 🔑 API Key")
+    saved_api_key = get_setting("api_key", "")
     api_key = st.text_input(
         "Groq API Key (Free)",
+        value=saved_api_key,
         type="password",
         placeholder="gsk_...",
         help="Get your FREE API key at https://console.groq.com/keys",
     )
+    # Auto-save API key when changed
+    if api_key != saved_api_key:
+        save_setting("api_key", api_key)
 
     if not api_key:
         st.info("💡 Get a **free** Groq API key at [console.groq.com](https://console.groq.com/keys)")
@@ -340,40 +350,90 @@ with st.sidebar:
     # Model selection
     st.markdown("### 🤖 Model")
     model_options = CodeReviewEngine.get_available_models()
+    saved_model = get_setting("model", model_options[0])
+    saved_model_idx = model_options.index(saved_model) if saved_model in model_options else 0
     selected_model = st.selectbox(
         "Select Model",
         model_options,
-        index=0,
+        index=saved_model_idx,
         help="Llama 3.3 70B gives the best reviews. Use 8B for faster results.",
     )
+    if selected_model != saved_model:
+        save_setting("model", selected_model)
 
     st.markdown("---")
 
     # Language selection
     st.markdown("### 💻 Language")
+    saved_lang = get_setting("language", SUPPORTED_LANGUAGES[0])
+    saved_lang_idx = SUPPORTED_LANGUAGES.index(saved_lang) if saved_lang in SUPPORTED_LANGUAGES else 0
     language = st.selectbox(
         "Programming Language",
         SUPPORTED_LANGUAGES,
-        index=0,
+        index=saved_lang_idx,
     )
+    if language != saved_lang:
+        save_setting("language", language)
 
     st.markdown("---")
 
     # Review mode
     st.markdown("### 📋 Review Mode")
+    mode_options = ["🔍 Comprehensive", "🔒 Security Focus", "⚡ Quick Review"]
+    saved_mode = get_setting("review_mode", mode_options[0])
+    saved_mode_idx = mode_options.index(saved_mode) if saved_mode in mode_options else 0
     review_mode = st.radio(
         "Choose review type",
-        ["🔍 Comprehensive", "🔒 Security Focus", "⚡ Quick Review"],
-        index=0,
+        mode_options,
+        index=saved_mode_idx,
         help="Comprehensive: Full analysis | Security: Vulnerability-focused | Quick: Top issues only",
     )
+    if review_mode != saved_mode:
+        save_setting("review_mode", review_mode)
+
+    st.markdown("---")
+
+    # Review History in Sidebar (from SQLite DB)
+    st.markdown("### 📜 Review History")
+    sidebar_history = get_all_reviews()
+    if sidebar_history:
+        # Show last 10 reviews in sidebar
+        for entry in sidebar_history[:10]:
+            score = entry.get("score", 0)
+            lang = entry.get("language", "?")
+            ts = entry.get("timestamp", "")
+            date = entry.get("date", "")
+            snippet = entry.get("code_snippet", "code")[:30].replace("\n", " ")
+            if score >= 80:
+                color = "#10b981"
+            elif score >= 60:
+                color = "#3b82f6"
+            elif score >= 40:
+                color = "#f59e0b"
+            else:
+                color = "#ef4444"
+            st.markdown(f"""
+            <div style="background: var(--bg-card, #1a1f35); border: 1px solid var(--border-color, #2a2f45);
+                border-radius: 10px; padding: 0.6rem 0.8rem; margin-bottom: 0.4rem; font-size: 0.82rem;">
+                <span style="color: {color}; font-weight: 800; font-family: 'JetBrains Mono', monospace;">{score}</span>
+                <span style="color: var(--text-secondary, #94a3b8);"> · {lang} · {date} {ts}</span><br/>
+                <span style="color: var(--text-muted, #64748b); font-size: 0.75rem;">{snippet}…</span>
+            </div>
+            """, unsafe_allow_html=True)
+        if len(sidebar_history) > 10:
+            st.caption(f"+ {len(sidebar_history) - 10} more reviews…")
+        if st.button("🗑️ Clear All History", use_container_width=True):
+            clear_history()
+            st.rerun()
+    else:
+        st.caption("No reviews yet. Run your first review!")
 
     st.markdown("---")
 
     # About section
     with st.expander("ℹ️ About"):
         st.markdown("""
-        **AI Code Review Assistant** v1.0
+        **AI Code Review Assistant** v2.0
 
         Built with:
         - 🐍 Python
@@ -511,6 +571,24 @@ if review_clicked and code_input and api_key:
         progress_bar.progress(100, text=f"✅ Review complete in {elapsed}s")
         time.sleep(0.5)
         progress_bar.empty()
+
+        # ─── Save to Review History (SQLite) ────────────────────────
+        history_entry = {
+            "timestamp": datetime.now().strftime("%I:%M %p"),
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "score": review.get("overall_score", review.get("security_score", 0) * 10 if "Security" in review_mode else 0),
+            "language": language,
+            "model": selected_model,
+            "mode": review_mode,
+            "issues_count": len(review.get("issues", review.get("vulnerabilities", []))),
+            "summary": review.get("summary", ""),
+            "code_snippet": code_input,
+            "elapsed": elapsed,
+            "review": review,
+            "metrics": metrics,
+            "optimized_code": optimized_code,
+        }
+        save_review(history_entry)
 
         # Check for parse errors
         if review.get("parse_error"):
@@ -857,6 +935,66 @@ if review_clicked and code_input and api_key:
         st.error(f"❌ An error occurred: {str(e)}")
         with st.expander("Error Details"):
             st.code(str(e))
+
+
+# ─── Review History Dashboard (Persistent — SQLite) ─────────────────────────
+
+db_history = get_all_reviews()
+if db_history:
+    st.markdown("---")
+    st.markdown("## 📊 Review History Dashboard")
+    stats = get_stats()
+    st.markdown(f"*{stats['total']} review(s) — persisted across sessions*")
+
+    # ── Summary Stats ─────────────────────────────────────────────────
+    hs1, hs2, hs3, hs4 = st.columns(4)
+    with hs1:
+        st.metric("Total Reviews", stats["total"])
+    with hs2:
+        st.metric("Avg Score", f"{stats['avg_score']}/100")
+    with hs3:
+        st.metric("Best Score", f"{stats['best_score']}/100")
+    with hs4:
+        st.metric("Total Issues Found", stats["total_issues"])
+
+    # ── Past Reviews Table ────────────────────────────────────────────
+    st.markdown("### 📋 Past Reviews")
+    for entry in db_history:
+        score = entry.get("score", 0)
+        if score >= 80:
+            grade = "A"
+        elif score >= 60:
+            grade = "B"
+        elif score >= 40:
+            grade = "C"
+        else:
+            grade = "D"
+
+        review_id = entry.get("id", "?")
+        with st.expander(
+            f"📝 Review #{review_id}  —  Score: {score}/100 ({grade})  ·  "
+            f"{entry.get('language', '?')}  ·  {entry.get('date', '')} {entry.get('timestamp', '')}",
+            expanded=False,
+        ):
+            rc1, rc2, rc3, rc4 = st.columns(4)
+            with rc1:
+                st.metric("Score", f"{score}/100")
+            with rc2:
+                st.metric("Issues", entry.get("issues_count", 0))
+            with rc3:
+                st.metric("Model", entry.get("model", "?"))
+            with rc4:
+                st.metric("Time", f"{entry.get('elapsed', 0)}s")
+
+            st.markdown(f"**Summary:** {entry.get('summary', 'N/A')}")
+            st.markdown(f"**Mode:** {entry.get('mode', 'N/A')}")
+
+            with st.expander("View Code Submitted"):
+                st.code(entry.get("code_snippet", ""), language=entry.get("language", "python").lower().split()[0])
+
+            if entry.get("optimized_code"):
+                with st.expander("View Optimized Code"):
+                    st.code(entry.get("optimized_code", ""), language=entry.get("language", "python").lower().split()[0])
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
