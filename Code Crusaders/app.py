@@ -1,0 +1,869 @@
+"""
+🔍 AI Code Review Assistant
+A premium, AI-powered code review tool built with Streamlit, LangChain, and Groq.
+Analyzes code for bugs, security vulnerabilities, performance issues, and teaches best practices.
+"""
+
+import sys
+import os
+import time
+import streamlit as st
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from code_analyzer import CodeAnalyzer
+from review_engine import CodeReviewEngine
+from utils import (
+    SUPPORTED_LANGUAGES,
+    SEVERITY_EMOJI,
+    SEVERITY_COLOR,
+    CATEGORY_EMOJI,
+    detect_language,
+    sort_issues_by_severity,
+    count_by_severity,
+    count_by_category,
+    generate_markdown_report,
+)
+
+# ─── Page Configuration ─────────────────────────────────────────────────────
+
+st.set_page_config(
+    page_title="AI Code Review Assistant",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ─── Custom CSS ──────────────────────────────────────────────────────────────
+
+st.markdown("""
+<style>
+    /* ── Import Google Font ───────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    /* ── Global Theme ─────────────────────────────────────────── */
+    :root {
+        --bg-primary: #0a0e1a;
+        --bg-secondary: #111827;
+        --bg-card: #1a1f35;
+        --bg-card-hover: #1f2640;
+        --accent-primary: #6366f1;
+        --accent-secondary: #818cf8;
+        --accent-glow: rgba(99, 102, 241, 0.3);
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --border-color: #2a2f45;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --danger-glow: rgba(239, 68, 68, 0.2);
+        --info: #3b82f6;
+    }
+
+    .stApp {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    .main-header {
+        text-align: center;
+        padding: 2rem 0 1rem 0;
+    }
+
+    .main-header h1 {
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.3rem;
+        letter-spacing: -0.02em;
+    }
+
+    .main-header p {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        font-weight: 400;
+    }
+
+    /* ── Metric Cards ─────────────────────────────────────────── */
+    .metric-card {
+        background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-hover) 100%);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+
+    .metric-card:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 4px 24px var(--accent-glow);
+        transform: translateY(-2px);
+    }
+
+    .metric-value {
+        font-size: 2.4rem;
+        font-weight: 800;
+        font-family: 'JetBrains Mono', monospace;
+        margin: 0;
+    }
+
+    .metric-label {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        margin-top: 0.3rem;
+    }
+
+    /* ── Score Circle ─────────────────────────────────────────── */
+    .score-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem 0;
+    }
+
+    .score-circle {
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        box-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .score-number {
+        font-size: 3.2rem;
+        font-weight: 900;
+        font-family: 'JetBrains Mono', monospace;
+        line-height: 1;
+    }
+
+    .score-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-top: 0.3rem;
+    }
+
+    /* ── Issue Cards ──────────────────────────────────────────── */
+    .issue-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .issue-card:hover {
+        border-color: var(--accent-secondary);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .issue-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .severity-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .severity-critical { background: rgba(239,68,68,0.15); color: #ff6b6b; border: 1px solid rgba(239,68,68,0.3); }
+    .severity-high { background: rgba(255,140,0,0.15); color: #ff8c00; border: 1px solid rgba(255,140,0,0.3); }
+    .severity-medium { background: rgba(255,215,0,0.15); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+    .severity-low { background: rgba(68,187,68,0.15); color: #44bb44; border: 1px solid rgba(68,187,68,0.3); }
+
+    .category-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(99,102,241,0.12);
+        color: var(--accent-secondary);
+        border: 1px solid rgba(99,102,241,0.25);
+    }
+
+    .line-ref {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        font-family: 'JetBrains Mono', monospace;
+        margin-left: auto;
+    }
+
+    /* ── Learn & Fix Panel ────────────────────────────────────── */
+    .learn-fix-panel {
+        background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(99,102,241,0.08) 100%);
+        border: 1px solid rgba(16,185,129,0.2);
+        border-radius: 10px;
+        padding: 1.2rem;
+        margin-top: 1rem;
+    }
+
+    .learn-fix-title {
+        color: var(--success);
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* ── Strength Card ────────────────────────────────────────── */
+    .strength-item {
+        background: rgba(16,185,129,0.08);
+        border: 1px solid rgba(16,185,129,0.15);
+        border-radius: 10px;
+        padding: 0.8rem 1.2rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* ── Sidebar Styling ──────────────────────────────────────── */
+    section[data-testid="stSidebar"] {
+        background: var(--bg-secondary) !important;
+        border-right: 1px solid var(--border-color);
+    }
+
+    .sidebar-header {
+        text-align: center;
+        padding: 1rem 0;
+        margin-bottom: 1rem;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* ── Progress Bar ─────────────────────────────────────────── */
+    .quality-bar {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        height: 10px;
+        overflow: hidden;
+        margin-top: 0.3rem;
+    }
+
+    .quality-fill {
+        height: 100%;
+        border-radius: 8px;
+        transition: width 1s ease;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    .footer {
+        text-align: center;
+        padding: 2rem 0 1rem 0;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        border-top: 1px solid var(--border-color);
+        margin-top: 3rem;
+    }
+
+    /* ── Tabs ─────────────────────────────────────────────────── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px;
+        padding: 0.5rem 1.2rem;
+        font-weight: 600;
+    }
+
+    /* ── Hide Streamlit Defaults ──────────────────────────────── */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ─── Sidebar ─────────────────────────────────────────────────────────────────
+
+with st.sidebar:
+    st.markdown("""
+    <div class="sidebar-header">
+        <h2>⚙️ Configuration</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # API Key input
+    st.markdown("### 🔑 API Key")
+    api_key = st.text_input(
+        "Groq API Key (Free)",
+        type="password",
+        placeholder="gsk_...",
+        help="Get your FREE API key at https://console.groq.com/keys",
+    )
+
+    if not api_key:
+        st.info("💡 Get a **free** Groq API key at [console.groq.com](https://console.groq.com/keys)")
+
+    st.markdown("---")
+
+    # Model selection
+    st.markdown("### 🤖 Model")
+    model_options = CodeReviewEngine.get_available_models()
+    selected_model = st.selectbox(
+        "Select Model",
+        model_options,
+        index=0,
+        help="Llama 3.3 70B gives the best reviews. Use 8B for faster results.",
+    )
+
+    st.markdown("---")
+
+    # Language selection
+    st.markdown("### 💻 Language")
+    language = st.selectbox(
+        "Programming Language",
+        SUPPORTED_LANGUAGES,
+        index=0,
+    )
+
+    st.markdown("---")
+
+    # Review mode
+    st.markdown("### 📋 Review Mode")
+    review_mode = st.radio(
+        "Choose review type",
+        ["🔍 Comprehensive", "🔒 Security Focus", "⚡ Quick Review"],
+        index=0,
+        help="Comprehensive: Full analysis | Security: Vulnerability-focused | Quick: Top issues only",
+    )
+
+    st.markdown("---")
+
+    # About section
+    with st.expander("ℹ️ About"):
+        st.markdown("""
+        **AI Code Review Assistant** v1.0
+
+        Built with:
+        - 🐍 Python
+        - 🦜 LangChain
+        - ⚡ Groq (Free Tier)
+        - 🎨 Streamlit
+
+        **Models:** Llama 3.3, Mixtral, Gemma 2
+        **Cost:** 100% Free
+
+        *BMSCE XCEL Hackathon — Code Crusaders*
+        """)
+
+
+# ─── Main Header ─────────────────────────────────────────────────────────────
+
+st.markdown("""
+<div class="main-header">
+    <h1>🔍 AI Code Review Assistant</h1>
+    <p>Intelligent code analysis powered by AI — Find bugs, vulnerabilities & learn best practices</p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ─── Sample Loading Callbacks ────────────────────────────────────────────────
+# These must run BEFORE the text_area widget is instantiated
+
+def _load_sample(filename: str):
+    """Callback to load sample code into session state before widget renders."""
+    samples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples")
+    sample_path = os.path.join(samples_dir, filename)
+    if os.path.exists(sample_path):
+        with open(sample_path, "r", encoding="utf-8") as f:
+            st.session_state["code_paste"] = f.read()
+
+
+# ─── Code Input ──────────────────────────────────────────────────────────────
+
+input_tab, upload_tab, sample_tab = st.tabs(["📝 Paste Code", "📁 Upload File", "📦 Sample Code"])
+
+code_input = ""
+
+with input_tab:
+    code_input = st.text_area(
+        "Paste your code here",
+        height=350,
+        placeholder="# Paste your code here...\n\ndef example():\n    pass",
+        key="code_paste",
+    )
+
+with upload_tab:
+    uploaded_file = st.file_uploader(
+        "Upload a source code file",
+        type=["py", "js", "ts", "java", "cpp", "c", "cs", "go", "rs", "rb", "php", "swift", "kt", "sql", "html", "css", "sh"],
+        help="Supports 15+ programming languages",
+    )
+    if uploaded_file:
+        code_input = uploaded_file.read().decode("utf-8", errors="replace")
+        detected_lang = detect_language(uploaded_file.name)
+        if detected_lang != "Unknown":
+            language = detected_lang
+        st.code(code_input, language=language.lower().split()[0])
+
+with sample_tab:
+    sample_col1, sample_col2 = st.columns(2)
+    with sample_col1:
+        st.button(
+            "🐛 Load Bad Code Sample",
+            use_container_width=True,
+            on_click=_load_sample,
+            args=("sample_bad.py",),
+        )
+
+    with sample_col2:
+        st.button(
+            "✅ Load Good Code Sample",
+            use_container_width=True,
+            on_click=_load_sample,
+            args=("sample_good.py",),
+        )
+
+
+# ─── Review Button ───────────────────────────────────────────────────────────
+
+st.markdown("")
+col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+with col_btn2:
+    review_clicked = st.button(
+        "🚀 Run AI Code Review",
+        use_container_width=True,
+        type="primary",
+        disabled=not code_input or not api_key,
+    )
+
+if not api_key and code_input:
+    st.warning("⚠️ Please enter your **Groq API key** in the sidebar to run reviews. It's FREE!")
+
+if not code_input and api_key:
+    st.info("📝 Paste code, upload a file, or load a sample to get started.")
+
+
+# ─── Run Review ──────────────────────────────────────────────────────────────
+
+if review_clicked and code_input and api_key:
+
+    # Progress indicators
+    progress_bar = st.progress(0, text="🔄 Initializing AI engine...")
+    start_time = time.time()
+
+    try:
+        # Step 1: Static Analysis
+        progress_bar.progress(15, text="📊 Running static analysis...")
+        analyzer = CodeAnalyzer(code_input, language)
+        metrics = analyzer.get_metrics()
+        static_issues = analyzer.get_static_issues()
+        functions_summary = analyzer.get_functions_summary()
+
+        # Step 2: LLM Review
+        progress_bar.progress(25, text=f"🤖 Analyzing with {selected_model}...")
+        engine = CodeReviewEngine(api_key=api_key, model_name=selected_model)
+
+        if "Security" in review_mode:
+            review = engine.security_review(code_input, language)
+        elif "Quick" in review_mode:
+            review = engine.quick_review(code_input, language)
+        else:
+            review = engine.review_code(code_input, language)
+
+        # Step 3: Generate Optimized Code
+        progress_bar.progress(65, text="✨ Generating optimized code...")
+        optimized_code = engine.optimize_code(code_input, language)
+
+        progress_bar.progress(95, text="📄 Finalizing report...")
+        elapsed = round(time.time() - start_time, 2)
+        progress_bar.progress(100, text=f"✅ Review complete in {elapsed}s")
+        time.sleep(0.5)
+        progress_bar.empty()
+
+        # Check for parse errors
+        if review.get("parse_error"):
+            st.error("⚠️ Failed to parse AI response. Please try again.")
+            with st.expander("Raw Response"):
+                st.code(review.get("raw_response", ""))
+            st.stop()
+
+        # ─── Results Display ─────────────────────────────────────────
+
+        st.markdown("---")
+        st.markdown("## 📊 Review Results")
+
+        # Top-level metrics row
+        overall_score = review.get("overall_score", 0)
+        issues = review.get("issues", [])
+        # For security review mode, adapt keys
+        if "Security" in review_mode and "vulnerabilities" in review:
+            issues = review.get("vulnerabilities", [])
+
+        severity_counts = count_by_severity(issues) if issues else {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+
+        # Score gradient
+        if overall_score >= 80:
+            score_color = "#10b981"
+            score_bg = "rgba(16,185,129,0.08)"
+            score_border = "rgba(16,185,129,0.3)"
+            grade = "A"
+        elif overall_score >= 60:
+            score_color = "#3b82f6"
+            score_bg = "rgba(59,130,246,0.08)"
+            score_border = "rgba(59,130,246,0.3)"
+            grade = "B"
+        elif overall_score >= 40:
+            score_color = "#f59e0b"
+            score_bg = "rgba(245,158,11,0.08)"
+            score_border = "rgba(245,158,11,0.3)"
+            grade = "C"
+        else:
+            score_color = "#ef4444"
+            score_bg = "rgba(239,68,68,0.08)"
+            score_border = "rgba(239,68,68,0.3)"
+            grade = "D"
+
+        # --- Score + Summary Row ---
+        score_col, summary_col = st.columns([1, 2])
+
+        with score_col:
+            if "Security" in review_mode:
+                sec_score = review.get("security_score", 0)
+                display_score = sec_score * 10
+            else:
+                display_score = overall_score
+
+            st.markdown(f"""
+            <div class="score-container">
+                <div class="score-circle" style="
+                    background: {score_bg};
+                    border: 3px solid {score_border};
+                ">
+                    <div class="score-number" style="color: {score_color};">{display_score}</div>
+                    <div class="score-label">out of 100</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with summary_col:
+            st.markdown(f"### 📝 Summary")
+            st.markdown(review.get("summary", "No summary available."))
+            st.markdown(f"**⏱️ Analysis Time:** {elapsed}s &nbsp; | &nbsp; **🤖 Model:** {selected_model} &nbsp; | &nbsp; **📋 Grade:** {grade}")
+
+        # --- Severity Count Metrics ---
+        st.markdown("")
+        c1, c2, c3, c4, c5 = st.columns(5)
+
+        with c1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: {score_color};">{display_score}</div>
+                <div class="metric-label">Quality Score</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with c2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: #ff4444;">{severity_counts.get("Critical", 0)}</div>
+                <div class="metric-label">🔴 Critical</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with c3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: #ff8c00;">{severity_counts.get("High", 0)}</div>
+                <div class="metric-label">🟠 High</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with c4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: #ffd700;">{severity_counts.get("Medium", 0)}</div>
+                <div class="metric-label">🟡 Medium</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with c5:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: #44bb44;">{severity_counts.get("Low", 0)}</div>
+                <div class="metric-label">🟢 Low</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("")
+
+        # --- Quality Metrics Bars ---
+        ai_metrics = review.get("metrics", {})
+        if ai_metrics and not "Security" in review_mode:
+            st.markdown("### 📈 Quality Metrics")
+            metric_cols = st.columns(5)
+            metric_items = [
+                ("Readability", "readability", "#6366f1"),
+                ("Maintainability", "maintainability", "#a855f7"),
+                ("Security", "security", "#ef4444"),
+                ("Performance", "performance", "#f59e0b"),
+                ("Best Practices", "best_practices", "#10b981"),
+            ]
+            for col, (label, key, color) in zip(metric_cols, metric_items):
+                val = ai_metrics.get(key, 0)
+                pct = val * 10
+                with col:
+                    st.markdown(f"""
+                    <div class="metric-card" style="padding: 1rem;">
+                        <div class="metric-value" style="color: {color}; font-size: 1.8rem;">{val}/10</div>
+                        <div class="metric-label">{label}</div>
+                        <div class="quality-bar">
+                            <div class="quality-fill" style="width: {pct}%; background: {color};"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            st.markdown("")
+
+        # --- Issues Tab ---
+        issues_tab, optimized_tab, static_tab, strengths_tab, report_tab = st.tabs([
+            f"🐛 Issues ({len(issues)})",
+            "✅ Optimized Code",
+            f"📊 Static Analysis ({metrics.get('static_issues', 0)})",
+            f"✨ Strengths",
+            "📄 Download Report",
+        ])
+
+        with issues_tab:
+            if not issues:
+                st.success("🎉 No issues found! Your code looks great.")
+            else:
+                sorted_issues = sort_issues_by_severity(issues)
+
+                # Filter controls
+                filter_col1, filter_col2 = st.columns(2)
+                with filter_col1:
+                    sev_filter = st.multiselect(
+                        "Filter by Severity",
+                        ["Critical", "High", "Medium", "Low"],
+                        default=["Critical", "High", "Medium", "Low"],
+                    )
+                with filter_col2:
+                    cats = list(set(i.get("category", "Other") for i in issues))
+                    cat_filter = st.multiselect(
+                        "Filter by Category",
+                        cats,
+                        default=cats,
+                    )
+
+                filtered = [
+                    i for i in sorted_issues
+                    if i.get("severity", "Low") in sev_filter
+                    and i.get("category", "Other") in cat_filter
+                ]
+
+                for idx, issue in enumerate(filtered):
+                    sev = issue.get("severity", "Low")
+                    cat = issue.get("category", "Other")
+                    title = issue.get("title", "Issue")
+                    sev_class = f"severity-{sev.lower()}"
+                    cat_emoji = CATEGORY_EMOJI.get(cat, "📋")
+
+                    with st.expander(
+                        f"{SEVERITY_EMOJI.get(sev, '⚪')} [{sev}] {cat_emoji} {title}  —  {issue.get('line_reference', '')}",
+                        expanded=(sev in ("Critical", "High")),
+                    ):
+                        # Description
+                        st.markdown(f"**📝 Description:** {issue.get('description', 'N/A')}")
+
+                        st.markdown("")
+
+                        # Problematic Code
+                        prob_code = issue.get("problematic_code") or issue.get("vulnerable_code", "")
+                        if prob_code:
+                            st.markdown("**❌ Problematic Code:**")
+                            st.code(prob_code, language=language.lower().split()[0])
+
+                        # Learn & Fix Panel
+                        fix_code = issue.get("suggested_fix") or issue.get("secure_fix", "")
+                        explanation = issue.get("explanation", "")
+                        reference = issue.get("learning_reference") or issue.get("reference", "")
+
+                        if fix_code or explanation:
+                            st.markdown("""
+                            <div class="learn-fix-panel">
+                                <div class="learn-fix-title">✅ Learn & Fix — Best Practice Solution</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            if fix_code:
+                                st.markdown("**✅ Best Practice Code:**")
+                                st.code(fix_code, language=language.lower().split()[0])
+
+                            if explanation:
+                                st.markdown(f"**📖 Why This Is Better:** {explanation}")
+
+                            if reference:
+                                st.markdown(f"**🔗 Learn More:** {reference}")
+
+        with static_tab:
+            st.markdown("### 📊 Code Metrics (Static Analysis)")
+            st.markdown("*These metrics are computed locally without AI — instant results.*")
+
+            sm1, sm2, sm3, sm4 = st.columns(4)
+            with sm1:
+                st.metric("Total Lines", metrics["total_lines"])
+            with sm2:
+                st.metric("Functions", metrics["function_count"])
+            with sm3:
+                st.metric("Classes", metrics["class_count"])
+            with sm4:
+                st.metric("Complexity", metrics["cyclomatic_complexity"])
+
+            sm5, sm6, sm7, sm8 = st.columns(4)
+            with sm5:
+                st.metric("Non-Empty Lines", metrics["non_empty_lines"])
+            with sm6:
+                st.metric("Comment Lines", metrics["comment_lines"])
+            with sm7:
+                st.metric("Comment Ratio", f"{metrics['comment_ratio']}%")
+            with sm8:
+                st.metric("Imports", metrics["import_count"])
+
+            # Static issues
+            if static_issues:
+                st.markdown("### ⚠️ Static Analysis Issues")
+                for si in static_issues:
+                    severity = si.get("severity", "Low")
+                    emoji = SEVERITY_EMOJI.get(severity, "⚪")
+                    st.markdown(
+                        f"- {emoji} **[{severity}]** Line {si.get('line', '?')}: "
+                        f"{si.get('message', 'N/A')} ({si.get('type', '')})"
+                    )
+
+            # Function details
+            if functions_summary:
+                st.markdown("### 📦 Functions Detected")
+                for fn in functions_summary:
+                    body_lines = fn.get("body_lines", 0)
+                    warn = " ⚠️ Long function!" if body_lines > 50 else ""
+                    st.markdown(
+                        f"- `{fn['name']}()` — Line {fn['line']}, "
+                        f"{fn['args']} args, {body_lines} lines{warn}"
+                    )
+
+        with strengths_tab:
+            strengths = review.get("strengths", [])
+            if "Security" in review_mode:
+                strengths = review.get("security_recommendations", strengths)
+
+            if strengths:
+                st.markdown("### ✨ What's Good About Your Code")
+                for s in strengths:
+                    st.markdown(f"""
+                    <div class="strength-item">
+                        <span>💪</span> {s}
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No specific strengths identified in this review.")
+
+        with optimized_tab:
+            st.markdown("### ✅ Optimized Code")
+            st.markdown("*AI-generated best-practice version of your code with all issues fixed.*")
+
+            if optimized_code:
+                # Side-by-side view
+                st.markdown("#### 🔄 Before vs After")
+                before_col, after_col = st.columns(2)
+
+                with before_col:
+                    st.markdown("**❌ Original Code:**")
+                    st.code(code_input, language=language.lower().split()[0])
+
+                with after_col:
+                    st.markdown("**✅ Optimized Code:**")
+                    st.code(optimized_code, language=language.lower().split()[0])
+
+                st.markdown("---")
+
+                # Full optimized code block
+                st.markdown("#### 📋 Full Optimized Code (copy-ready)")
+                st.code(optimized_code, language=language.lower().split()[0])
+
+                # Download button for optimized code
+                lang_ext_map = {
+                    "Python": ".py", "JavaScript": ".js", "TypeScript": ".ts",
+                    "Java": ".java", "C++": ".cpp", "C": ".c", "C#": ".cs",
+                    "Go": ".go", "Rust": ".rs", "Ruby": ".rb", "PHP": ".php",
+                }
+                ext = lang_ext_map.get(language, ".txt")
+                st.download_button(
+                    label="📥 Download Optimized Code",
+                    data=optimized_code,
+                    file_name=f"optimized_code{ext}",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+            else:
+                st.warning("Could not generate optimized code. Please try again.")
+
+        with report_tab:
+            st.markdown("### 📄 Download Full Report")
+            report_md = generate_markdown_report(review, language, code_input)
+            st.download_button(
+                label="📥 Download Markdown Report",
+                data=report_md,
+                file_name="code_review_report.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+            with st.expander("Preview Report"):
+                st.markdown(report_md)
+
+    except Exception as e:
+        progress_bar.empty()
+        st.error(f"❌ An error occurred: {str(e)}")
+        with st.expander("Error Details"):
+            st.code(str(e))
+
+
+# ─── Footer ──────────────────────────────────────────────────────────────────
+
+st.markdown("""
+<div class="footer">
+    Built with ❤️ by <strong>Code Crusaders</strong> | BMSCE XCEL Hackathon 2026 |
+    Powered by <strong>LangChain</strong> + <strong>Groq</strong> + <strong>Streamlit</strong>
+</div>
+""", unsafe_allow_html=True)
