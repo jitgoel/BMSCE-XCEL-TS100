@@ -1,0 +1,4 @@
+cd "C:\Users\venug\OneDrive\文档\email_summarizer_ai"
+python -m venv venv
+venv\Scripts\activate
+streamlit run app.py
