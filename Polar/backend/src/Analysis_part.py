@@ -95,26 +95,49 @@ class ResumeAnalysisPipeline:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _manual_skill_check(self, resume_text: str, key_skills: list[str]) -> dict:
-        """
-        Manually checks which key skills from the JD appear in the resume.
-        Case-insensitive substring match. No LLM needed.
-        """
-        resume_lower = resume_text.lower()
-        matched, missing = [], []
+      """
+      Uses LLM to semantically match skills from the JD with resume content.
+      Returns same output structure as manual check for frontend compatibility.
+      """
+      prompt = ChatPromptTemplate.from_template("""
+  You are a skill matching expert. Analyze the resume and identify which key skills are present.
 
-        for skill in key_skills:
-            if skill.lower() in resume_lower:
-                matched.append(skill)
-            else:
-                missing.append(skill)
+  RESUME:
+  {resume_text}
 
-        match_pct = round((len(matched) / len(key_skills)) * 100, 1) if key_skills else 0
+  KEY SKILLS TO MATCH:
+  {key_skills}
 
-        return {
-            "manual_matched_skills": matched,
-            "manual_missing_skills": missing,
-            "manual_match_percentage": match_pct,
-        }
+  Perform SEMANTIC matching:
+  - "Python" matches "Python 3", "Py", "Python programming"
+  - "REST API" matches "RESTful", "HTTP APIs", "API development"
+  - "Machine Learning" matches "ML", "Deep Learning", "Neural Networks"
+  - "SQL" matches "PostgreSQL", "MySQL", "Database queries"
+  - "Docker" matches "Containerization", "Container orchestration"
+
+  Return ONLY valid JSON:
+  {{
+    "matched": ["<skill found in resume>"],
+    "missing": ["<skill not found in resume>"]
+  }}
+  """)
+      
+      chain = prompt | self.llm | self.parser
+      
+      result = chain.invoke({
+        "resume_text": resume_text,
+        "key_skills": ", ".join(key_skills),
+      })
+      
+      matched = result.get("matched", [])
+      missing = result.get("missing", [])
+      match_pct = round((len(matched) / len(key_skills)) * 100, 1) if key_skills else 0
+
+      return {
+        "manual_matched_skills": matched,
+        "manual_missing_skills": missing,
+        "manual_match_percentage": match_pct,
+      }
 
     # ──────────────────────────────────────────────────────────────────────────
     # CHAIN BUILDERS
@@ -122,78 +145,101 @@ class ResumeAnalysisPipeline:
 
     def _build_ats_chain(self):
         prompt = ChatPromptTemplate.from_template("""
-You are an expert ATS (Applicant Tracking System) evaluator.
+      You are an expert ATS (Applicant Tracking System) evaluator and resume analyst.
 
-Analyze the resume below against the job description and return ONLY valid JSON.
+      Analyze the resume below against the job description comprehensively.
+      Focus on: keyword alignment, content relevance, structural optimization, and semantic understanding — NOT just surface-level matching.
 
-RESUME:
-{resume_text}
+      RESUME:
+      {resume_text}
 
-JOB DESCRIPTION:
-{jd_text}
+      JOB DESCRIPTION:
+      {jd_text}
 
-Return this exact JSON structure:
-{{
-  "ats_overall_score": <integer 0-100>,
-  "breakdown": {{
-    "keyword_match": <integer 0-100>,
-    "section_headers": <integer 0-100>,
-    "contact_info": <integer 0-100>,
-    "formatting": <integer 0-100>,
-    "quantified_impact": <integer 0-100>,
-    "action_verbs": <integer 0-100>,
-    "readability": <integer 0-100>
-  }},
-  "ats_killers": [
-    {{"issue": "<issue>", "severity": "high|medium|low", "fix": "<fix>"}}
-  ],
-  "keyword_density_analysis": {{
-    "high_frequency_jd_keywords": ["<keyword>"],
-    "found_in_resume": ["<keyword>"],
-    "missing_from_resume": ["<keyword>"]
-  }}
-}}
-""")
+      Evaluation Criteria:
+      1. Keyword Match: Both direct and semantic (e.g., "API development" matches "REST services")
+      2. Section Headers: Standard ATS-readable formatting (Experience, Skills, Education, etc.)
+      3. Contact Info: Clear, parseable format without visual characters
+      4. Formatting: No tables, images, columns, special fonts — plain text friendly
+      5. Quantified Impact: Metrics, numbers, percentages in achievement statements
+      6. Action Verbs: Strong, industry-appropriate verbs (Developed, Engineered, Architected, etc.)
+      7. Readability: Logical flow, clear hierarchy, no jargon overload
+
+      Return this exact JSON structure:
+      {{
+        "ats_overall_score": <integer 0-100>,
+        "breakdown": {{
+          "keyword_match": <integer 0-100>,
+          "section_headers": <integer 0-100>,
+          "contact_info": <integer 0-100>,
+          "formatting": <integer 0-100>,
+          "quantified_impact": <integer 0-100>,
+          "action_verbs": <integer 0-100>,
+          "readability": <integer 0-100>
+        }},
+        "ats_killers": [
+          {{"issue": "<issue>", "severity": "high|medium|low", "fix": "<fix>"}}
+        ],
+        "keyword_density_analysis": {{
+          "high_frequency_jd_keywords": ["<keyword>"],
+          "found_in_resume": ["<keyword>"],
+          "missing_from_resume": ["<keyword>"]
+        }}
+      }}
+      """)
         return prompt | self.llm | self.parser
 
     def _build_skill_gap_chain(self):
         prompt = ChatPromptTemplate.from_template("""
-You are a senior technical recruiter performing a skill gap analysis.
+      You are a senior technical recruiter performing a skill gap analysis.
 
-RESUME:
-{resume_text}
+      RESUME:
+      {resume_text}
 
-JOB DESCRIPTION:
-{jd_text}
+      JOB DESCRIPTION:
+      {jd_text}
 
-KEY SKILLS FROM JD (manually extracted):
-{key_skills}
+      KEY SKILLS FROM JD (manually extracted):
+      {key_skills}
 
-Return ONLY valid JSON:
-{{
-  "hard_skills": {{
-    "matched": ["<skill>"],
-    "missing": ["<skill>"],
-    "partial": [{{"skill": "<skill>", "note": "<what they have vs what's needed>"}}]
-  }},
-  "soft_skills": {{
-    "matched": ["<skill>"],
-    "missing": ["<skill>"]
-  }},
-  "experience_gap": {{
-    "required_years": <number or null>,
-    "candidate_years": <number or null>,
-    "gap_note": "<note>"
-  }},
-  "education_fit": {{
-    "required": "<requirement>",
-    "candidate": "<what they have>",
-    "fit": "strong|moderate|weak"
-  }},
-  "overall_skill_fit": "strong|moderate|weak",
-  "priority_skills_to_add": ["<skill — most impactful to learn first>"]
-}}
-""")
+      CRITICAL: Perform SEMANTIC skill matching, not just keyword matching.
+      - "Python" matches "Python 3", "Py", "Python programming"
+      - "REST API" matches "RESTful services", "HTTP APIs", "API development"
+      - "Machine Learning" matches "ML", "Deep Learning", "Neural Networks"
+      - "SQL" matches "PostgreSQL", "MySQL", "Database queries"
+      - "Docker" matches "Containerization", "Container orchestration"
+      - Understand that similar technologies with different names should be grouped
+
+      Analyze both explicit mentions AND inferred skills from projects/experience.
+
+      Return ONLY valid JSON:
+      {{
+        "hard_skills": {{
+          "matched": [
+            {{"skill": "<JD skill>", "found_as": "<how it appears in resume>", "confidence": "high|medium"}}
+          ],
+          "missing": ["<skill>"],
+          "partial": [{{"skill": "<skill>", "note": "<what they have vs what's needed>", "semantic_match": "explanation of related skills they have"}}]
+        }},
+        "soft_skills": {{
+          "matched": ["<skill>"],
+          "missing": ["<skill>"]
+        }},
+        "experience_gap": {{
+          "required_years": <number or null>,
+          "candidate_years": <number or null>,
+          "gap_note": "<note>"
+        }},
+        "education_fit": {{
+          "required": "<requirement>",
+          "candidate": "<what they have>",
+          "fit": "strong|moderate|weak"
+        }},
+        "overall_skill_fit": "strong|moderate|weak",
+        "priority_skills_to_add": ["<skill — most impactful to learn first>"],
+        "semantic_analysis_notes": "<explain any semantic skill matches or technology equivalences you identified>"
+      }}
+      """)
         return prompt | self.llm | self.parser
 
     def _build_project_rating_chain(self):
@@ -309,75 +355,84 @@ Return ONLY valid JSON:
 
     def _build_final_resume_chain(self):
         prompt = ChatPromptTemplate.from_template("""
-You are an expert resume writer. Using the original resume AND all analysis results below,
-produce a complete rewritten resume optimized for the job description.
+      You are an expert resume writer. Using the original resume AND all analysis results below,
+      produce a complete rewritten resume optimized for the job description.
 
-ORIGINAL RESUME:
-{resume_text}
+      CRITICAL CONSTRAINTS:
+      - ONLY use information present in the original resume
+      - DO NOT fabricate skills, experiences, projects, or achievements
+      - You may enhance wording, add context, or quantify vague metrics (with ~ estimates)
+      - Keep all claims grounded in resume content
+      - Maintain ATS-friendly formatting (no tables, images, special characters)
 
-JOB DESCRIPTION:
-{jd_text}
+      ORIGINAL RESUME:
+      {resume_text}
 
-ANALYSIS CONTEXT:
-- ATS Issues: {ats_killers}
-- Missing Skills: {missing_skills}
-- Project Improvements: {project_improvements}
-- Suggested Improvements: {improvements}
+      JOB DESCRIPTION:
+      {jd_text}
 
-Rules:
-- Keep it to 1 page worth of content (unless senior, max 2)
-- Use strong action verbs for every bullet
-- Quantify every achievement possible (use estimates if needed, mark with ~)
-- Inject missing JD keywords naturally
-- Fix all ATS issues identified
-- Rewrite projects with improved descriptions
-- Add a strong Summary section targeting this specific JD
+      ANALYSIS CONTEXT:
+      - ATS Issues: {ats_killers}
+      - Missing Skills: {missing_skills}
+      - Project Improvements: {project_improvements}
+      - Suggested Improvements: {improvements}
 
-Return ONLY valid JSON:
-{{
-  "final_resume": {{
-    "name": "<name>",
-    "contact": {{
-      "email": "<email>",
-      "phone": "<phone or 'not found'>",
-      "linkedin": "<linkedin or 'not found'>",
-      "github": "<github or 'not found'>",
-      "location": "<location>"
-    }},
-    "summary": "<3-4 line professional summary targeting this JD>",
-    "skills": {{
-      "technical": ["<skill>"],
-      "tools": ["<tool>"],
-      "soft": ["<soft skill>"]
-    }},
-    "experience": [
+      Rules:
+      - Keep it to 1 page worth of content (unless senior, max 2)
+      - Use strong action verbs for every bullet (drawn from original content)
+      - Add quantified metrics only if extractable from resume; mark estimates with ~
+      - Inject JD keywords ONLY if they relate to existing resume content
+      - Fix all ATS issues without changing factual content
+      - Rewrite projects using improved descriptions from analysis
+      - Add a strong Summary section (3-4 lines) targeting this JD, based on actual experience
+
+      STRICT: Any skill, tool, or achievement not in the original resume must be excluded.
+
+      Return ONLY valid JSON:
       {{
-        "title": "<job title>",
-        "company": "<company>",
-        "duration": "<duration>",
-        "bullets": ["<improved bullet>"]
+        "final_resume": {{
+          "name": "<name from resume>",
+          "contact": {{
+            "email": "<email from resume>",
+            "phone": "<phone from resume or 'not found'>",
+            "linkedin": "<linkedin from resume or 'not found'>",
+            "github": "<github from resume or 'not found'>",
+            "location": "<location from resume>"
+          }},
+          "summary": "<3-4 line professional summary targeting this JD, based ONLY on resume content>",
+          "skills": {{
+            "technical": ["<skill mentioned in resume>"],
+            "tools": ["<tool mentioned in resume>"],
+            "soft": ["<soft skill inferred from resume>"]
+          }},
+          "experience": [
+            {{
+        "title": "<job title from resume>",
+        "company": "<company from resume>",
+        "duration": "<duration from resume>",
+        "bullets": ["<enhanced bullet, same facts, stronger wording>"]
+            }}
+          ],
+          "projects": [
+            {{
+        "name": "<project from resume>",
+        "tech_stack": ["<tech from resume>"],
+        "bullets": ["<rewritten bullet with improved clarity and JD alignment>"]
+            }}
+          ],
+          "education": [
+            {{
+        "degree": "<degree from resume>",
+        "school": "<school from resume>",
+        "year": "<year from resume>",
+        "relevant_coursework": ["<course from resume if mentioned>"]
+            }}
+          ],
+          "certifications": ["<cert from resume if any>"],
+          "resume_improvement_summary": "<what was reworded/restructured for ATS and JD fit; no false claims>"
+        }}
       }}
-    ],
-    "projects": [
-      {{
-        "name": "<project>",
-        "tech_stack": ["<tech>"],
-        "bullets": ["<improved bullet>"]
-      }}
-    ],
-    "education": [
-      {{
-        "degree": "<degree>",
-        "school": "<school>",
-        "year": "<year>",
-        "relevant_coursework": ["<course>"]
-      }}
-    ],
-    "certifications": ["<cert if any>"],
-    "resume_improvement_summary": "<what was changed and why>"
-  }}
-}}
-""")
+      """)
         return prompt | self.llm | self.parser
 
     # ──────────────────────────────────────────────────────────────────────────

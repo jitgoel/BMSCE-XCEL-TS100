@@ -102,10 +102,131 @@ const Section = ({ title, children, span = "span 6" }) => (
   </div>
 );
 
+const FinalResume = ({ data }) => {
+  const resume = data?.final_resume?.final_resume;
+  console.log('Rendering Final Resume with data:', resume);
+
+  if (!resume) return null;
+
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        color: "#111",
+        padding: "40px",
+        borderRadius: "10px",
+        fontFamily: "Inter, sans-serif",
+        lineHeight: 1.6,
+      }}
+    >
+      {/* NAME */}
+      <h1 style={{ fontSize: 28, marginBottom: 6 }}>{resume.name}</h1>
+
+      {/* CONTACT */}
+      <div style={{ fontSize: 13, color: "#444", marginBottom: 20 }}>
+        {resume.contact.email} | {resume.contact.phone} |{" "}
+        {resume.contact.location}
+      </div>
+
+      {/* SUMMARY */}
+      <section style={{ marginBottom: 18 }}>
+        <h3 style={{ borderBottom: "1px solid #ddd" }}>Summary</h3>
+        <p style={{ fontSize: 13 }}>{resume.summary}</p>
+      </section>
+
+      {/* SKILLS */}
+      <section style={{ marginBottom: 18 }}>
+        <h3 style={{ borderBottom: "1px solid #ddd" }}>Skills</h3>
+
+        <p>
+          <b>Technical:</b> {resume.skills.technical.join(", ")}
+        </p>
+
+        <p>
+          <b>Tools:</b> {resume.skills.tools.join(", ")}
+        </p>
+
+        <p>
+          <b>Soft:</b> {resume.skills.soft.join(", ")}
+        </p>
+      </section>
+
+      {/* EXPERIENCE */}
+      {resume.experience?.length > 0 && (
+        <section style={{ marginBottom: 18 }}>
+          <h3 style={{ borderBottom: "1px solid #ddd" }}>Experience</h3>
+
+          {resume.experience.map((exp, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <b>{exp.title}</b> — {exp.company}
+
+              <ul style={{ marginTop: 6 }}>
+                {exp.bullets?.map((b, idx) => (
+                  <li key={idx} style={{ fontSize: 13 }}>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* PROJECTS */}
+      <section style={{ marginBottom: 18 }}>
+        <h3 style={{ borderBottom: "1px solid #ddd" }}>Projects</h3>
+
+        {resume.projects.map((proj, i) => (
+          <div key={i} style={{ marginBottom: 12 }}>
+            <b>{proj.name}</b>
+
+            <div style={{ fontSize: 12, color: "#444", marginTop: 4 }}>
+              Tech: {proj.tech_stack.join(", ")}
+            </div>
+
+            <ul>
+              {proj.bullets?.map((b, idx) => (
+                <li key={idx} style={{ fontSize: 13 }}>
+                  {b}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+
+      {/* EDUCATION */}
+      <section style={{ marginBottom: 18 }}>
+        <h3 style={{ borderBottom: "1px solid #ddd" }}>Education</h3>
+
+        {resume.education.map((edu, i) => (
+          <div key={i} style={{ fontSize: 13 }}>
+            <b>{edu.degree}</b> — {edu.school}
+          </div>
+        ))}
+      </section>
+
+      {/* CERTIFICATIONS */}
+      <section>
+        <h3 style={{ borderBottom: "1px solid #ddd" }}>Certifications</h3>
+
+        <ul>
+          {resume.certifications.map((c, i) => (
+            <li key={i} style={{ fontSize: 13 }}>
+              {c}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+};
+
 export default function ProfessionalDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const data = location.state?.analysis?.analysis;
+  console.log('Received analysis data:', data);
 
   if (!data) return <div style={{ color: 'white', padding: 100, textAlign: 'center' }}>No analysis record found.</div>;
 
@@ -226,6 +347,10 @@ export default function ProfessionalDashboard() {
             ))}
           </div>
         </Section>
+
+        <Section title="Final Optimized Resume (ATS Ready)" span="span 12">
+  <FinalResume data={data} />
+</Section>
 
       </div>
     </div>

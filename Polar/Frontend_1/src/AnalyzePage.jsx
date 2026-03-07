@@ -256,7 +256,7 @@ export default function AnalyzePage() {
       const formData = new FormData();
       formData.append("resume", resumeFile);
       formData.append("jd_text", jobDescription);
-      const response = await fetch("https://bmsce-xcel-ts100.onrender.com/extract-skills", { method: "POST", body: formData });
+      const response = await fetch("http://127.0.0.1:8000/extract-skills", { method: "POST", body: formData });
       if (!response.ok) throw new Error("Backend error");
       const data = await response.json();
       setLoading(false);
