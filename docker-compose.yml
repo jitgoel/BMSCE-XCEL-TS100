@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: resumai_api
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app/backend
+      - chroma_data:/app/backend/chroma_data
+    environment:
+      - FLASK_ENV=development
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///app.db
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: resumai_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  chroma_data:

@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Analyzer — ResumAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        /* ── RESET & TOKENS ─────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #07070e;
+            --bg2: #0e0e1a;
+            --bg3: #13131f;
+            --glass: rgba(255, 255, 255, 0.04);
+            --glass2: rgba(255, 255, 255, 0.07);
+            --bdr: rgba(255, 255, 255, 0.09);
+            --bdr2: rgba(139, 92, 246, 0.3);
+            --p1: #8b5cf6;
+            --p2: #ec4899;
+            --grad: linear-gradient(135deg, #8b5cf6, #ec4899);
+            --fg: #f8f8ff;
+            --fg2: #a1a1aa;
+            --fg3: #6b7280;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --r: 12px;
+            --rl: 20px;
+            --t: all .25s ease;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: 'Inter', system-ui, sans-serif;
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ── LIGHT MODE ───────────────────────────────────────── */
+        [data-theme="light"] {
+            --bg: #f5f5fc;
+            --bg2: #ffffff;
+            --bg3: #eceef8;
+            --glass: rgba(139, 92, 246, .04);
+            --glass2: rgba(139, 92, 246, .09);
+            --bdr: rgba(0, 0, 0, .12);
+            --bdr2: rgba(139, 92, 246, .45);
+            --fg: #0f0f1a;
+            --fg2: #374151;
+            --fg3: #6b7280;
+        }
+
+        /* background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 400px;
+            z-index: -2;
+            pointer-events: none;
+            background: radial-gradient(ellipse 80% 100% at 50% -20%, rgba(139, 92, 246, .07), transparent);
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image: radial-gradient(circle, rgba(139, 92, 246, .07) 1px, transparent 1px);
+            background-size: 36px 36px;
+        }
+
+        [data-theme="light"] body::before {
+            background: radial-gradient(ellipse 80% 100% at 50% -10%, rgba(139, 92, 246, .12), transparent);
+        }
+
+        [data-theme="light"] body::after {
+            background-image: radial-gradient(circle, rgba(139, 92, 246, .09) 1px, transparent 1px);
+        }
+
+        /* ── NAVBAR ──────────────────────────────────────── */
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            height: 64px;
+            background: rgba(7, 7, 14, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--bdr);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        [data-theme="light"] .nav {
+            background: rgba(245, 245, 252, .88);
+        }
+
+        /* ── THEME TOGGLE BUTTON ──────────────────────────── */
+        .theme-toggle {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 1px solid var(--bdr);
+            background: var(--glass);
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .25s;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle:hover {
+            background: var(--glass2);
+            border-color: var(--bdr2);
+            transform: scale(1.1) rotate(15deg);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            text-decoration: none;
+        }
+
+        .logo-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: var(--grad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--fg);
+        }
+
+        .logo-text span {
+            background: var(--grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .55rem 1.1rem;
+            border-radius: var(--r);
+            font-size: .88rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: var(--t);
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        .btn-ghost {
+            background: var(--glass);
+            border: 1px solid var(--bdr);
+            color: var(--fg2);
+        }
+
+        .btn-ghost:hover {
+            color: var(--fg);
+            border-color: var(--bdr2);
+        }
+
+        .btn-primary {
+            background: var(--grad);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(139, 92, 246, .3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 24px rgba(139, 92, 246, .5);
+            transform: translateY(-1px);
+        }
+
+        .btn-lg {
+            padding: .8rem 1.8rem;
+            font-size: .95rem;
+        }
+
+        /* ── LAYOUT ──────────────────────────────────────── */
+        .layout {
+            display: flex;
+            min-height: calc(100vh - 64px);
+        }
+
+        .sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            background: var(--bg2);
+            border-right: 1px solid var(--bdr);
+            padding: 1.25rem 0;
+            position: sticky;
+            top: 64px;
+            height: calc(100vh - 64px);
+            overflow-y: auto;
+        }
+
+        .slabel {
+            padding: .35rem 1rem;
+            font-size: .7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            color: var(--fg3);
+        }
+
+        .slink {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .6rem 1rem;
+            font-size: .87rem;
+            font-weight: 500;
+            color: var(--fg2);
+            text-decoration: none;
+            transition: var(--t);
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .slink:hover {
+            color: var(--fg);
+            background: var(--glass);
+        }
+
+        .slink.active {
+            color: var(--p1);
+            background: rgba(139, 92, 246, .08);
+            border-right: 2px solid var(--p1);
+        }
+
+        .sdiv {
+            height: 1px;
+            background: var(--bdr);
+            margin: .75rem 1rem;
+        }
+
+        .main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 960px;
+            min-width: 0;
+        }
+
+        /* ── CARDS ───────────────────────────────────────── */
+        .card {
+            background: var(--bg2);
+            border: 1px solid var(--bdr);
+            border-radius: var(--rl);
+            padding: 1.5rem;
+        }
+
+        /* ── HEADINGS ────────────────────────────────────── */
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -.5px;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* ── MODE CARDS ──────────────────────────────────── */
+        .modes {
+            display: flex;
+            gap: .75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .mode {
+            flex: 1;
+            min-width: 130px;
+            padding: 1rem;
+            border-radius: var(--rl);
+            border: 2px solid var(--bdr);
+            background: var(--glass);
+            cursor: pointer;
+            transition: var(--t);
+            text-align: center;
+        }
+
+        .mode:hover {
+            border-color: var(--p1);
+            background: rgba(139, 92, 246, .05);
+        }
+
+        .mode.on {
+            border-color: var(--p1);
+            background: rgba(139, 92, 246, .1);
+        }
+
+        .mode-icon {
+            font-size: 1.4rem;
+            margin-bottom: .3rem;
+        }
+
+        .mode-label {
+            font-size: .83rem;
+            font-weight: 600;
+        }
+
+        /* ── TAB TOGGLE ──────────────────────────────────── */
+        .tab-row {
+            display: flex;
+            border: 1px solid var(--bdr);
+            border-radius: var(--r);
+            overflow: hidden;
+            margin-bottom: .85rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: .55rem;
+            font-size: .82rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--t);
+            background: var(--glass);
+            color: var(--fg2);
+        }
+
+        .tab-btn.on {
+            background: rgba(139, 92, 246, .15);
+            color: var(--p1);
+        }
+
+        /* ── UPLOAD ZONE ──────────────────────────────────── */
+        .drop {
+            border: 2px dashed var(--bdr);
+            border-radius: var(--rl);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--t);
+        }
+
+        .drop:hover,
+        .drop.over {
+            border-color: var(--p1);
+            background: rgba(139, 92, 246, .04);
+        }
+
+        .drop-icon {
+            font-size: 2rem;
+            margin-bottom: .5rem;
+        }
+
+        .drop-title {
+            font-weight: 600;
+            font-size: .95rem;
+            margin-bottom: .25rem;
+        }
+
+        .drop-sub {
+            font-size: .8rem;
+            color: var(--fg2);
+        }
+
+        /* ── STATUS STRIP ─────────────────────────────────── */
+        .status-strip {
+            display: none;
+            align-items: center;
+            gap: .5rem;
+            padding: .5rem .85rem;
+            border-radius: var(--r);
+            font-size: .8rem;
+            margin-top: .6rem;
+        }
+
+        .status-strip.ok {
+            display: flex;
+            background: rgba(16, 185, 129, .08);
+            border: 1px solid rgba(16, 185, 129, .2);
+            color: var(--green);
+        }
+
+        .status-strip.err {
+            display: flex;
+            background: rgba(239, 68, 68, .08);
+            border: 1px solid rgba(239, 68, 68, .2);
+            color: var(--red);
+        }
+
+        .status-strip.warn {
+            display: flex;
+            background: rgba(245, 158, 11, .08);
+            border: 1px solid rgba(245, 158, 11, .2);
+            color: var(--yellow);
+        }
+
+        /* ── ERROR BANNER ─────────────────────────────────── */
+        .err-banner {
+            display: none;
+            align-items: center;
+            gap: .6rem;
+            background: rgba(239, 68, 68, .08);
+            border: 1px solid rgba(239, 68, 68, .25);
+            border-radius: var(--r);
+            padding: .75rem 1rem;
+            font-size: .85rem;
+            color: var(--red);
+            margin-bottom: 1rem;
+        }
+
+        .err-banner.show {
+            display: flex;
+        }
+
+        /* ── TEXTAREA / INPUT ─────────────────────────────── */
+        textarea,
+        select {
+            width: 100%;
+            background: var(--bg3);
+            border: 1px solid var(--bdr);
+            border-radius: var(--r);
+            padding: .75rem 1rem;
+            color: var(--fg);
+            font-family: inherit;
+            font-size: .85rem;
+            resize: vertical;
+            outline: none;
+            transition: var(--t);
+        }
+
+        textarea:focus,
+        select:focus {
+            border-color: var(--p1);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, .12);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+            cursor: pointer;
+        }
+
+        label.lbl {
+            display: block;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--fg2);
+            margin-bottom: .5rem;
+        }
+
+        label.lbl .req {
+            color: var(--red);
+            margin-left: .2rem;
+        }
+
+        /* ── OPTION BAR ──────────────────────────────────── */
+        .opt-row {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .opt-row label {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            font-size: .85rem;
+            cursor: pointer;
+        }
+
+        .opt-row input[type=checkbox] {
+            accent-color: var(--p1);
+            width: 15px;
+            height: 15px;
+        }
+
+        /* ── DIVIDER ─────────────────────────────────────── */
+        .divider {
+            height: 1px;
+            background: var(--bdr);
+            margin: 1.25rem 0;
+        }
+
+        /* ── SHAKE ANIMATION ─────────────────────────────── */
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0)
+            }
+
+            20% {
+                transform: translateX(-5px)
+            }
+
+            40% {
+                transform: translateX(5px)
+            }
+
+            60% {
+                transform: translateX(-3px)
+            }
+
+            80% {
+                transform: translateX(3px)
+            }
+        }
+
+        .shake {
+            animation: shake .4s ease;
+            border-color: var(--red) !important;
+        }
+
+        /* ── PROCESSING OVERLAY ──────────────────────────── */
+        .proc-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: rgba(7, 7, 14, 0.85);
+            backdrop-filter: blur(12px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .proc-overlay.show {
+            display: flex;
+        }
+
+        .proc-box {
+            background: var(--bg2);
+            border: 1px solid var(--bdr);
+            border-radius: 24px;
+            padding: 2.5rem;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .proc-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .proc-msg {
+            color: var(--fg2);
+            font-size: .88rem;
+            margin: .5rem 0 1.25rem;
+        }
+
+        .dots {
+            display: flex;
+            gap: .4rem;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--p1);
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: .2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: .4s;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: .3;
+                transform: scale(.8)
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        .pbar-wrap {
+            background: rgba(255, 255, 255, .06);
+            border-radius: 99px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .pbar {
+            height: 100%;
+            background: var(--grad);
+            border-radius: 99px;
+            transition: width .5s ease;
+            width: 0%;
+        }
+
+        .pbar-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: .35rem;
+            font-size: .75rem;
+            color: var(--fg3);
+        }
+
+        /* ── HISTORY ─────────────────────────────────────── */
+        .hist {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .85rem;
+            border-radius: var(--r);
+            background: var(--glass);
+            border: 1px solid var(--bdr);
+            margin-bottom: .6rem;
+            cursor: pointer;
+            transition: var(--t);
+        }
+
+        .hist:hover {
+            border-color: var(--bdr2);
+        }
+
+        .hist-file {
+            font-weight: 600;
+            font-size: .87rem;
+        }
+
+        .hist-sub {
+            font-size: .75rem;
+            color: var(--fg2);
+            margin-top: .1rem;
+        }
+
+        /* ── BADGE ───────────────────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .25rem .65rem;
+            border-radius: 20px;
+            font-size: .77rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .badge-blue {
+            background: rgba(59, 130, 246, .12);
+            border: 1px solid rgba(59, 130, 246, .25);
+            color: var(--blue);
+        }
+
+        .badge-purple {
+            background: rgba(139, 92, 246, .12);
+            border: 1px solid rgba(139, 92, 246, .25);
+            color: var(--p1);
+        }
+
+        .badge-pink {
+            background: rgba(236, 72, 153, .12);
+            border: 1px solid rgba(236, 72, 153, .25);
+            color: var(--p2);
+        }
+
+        /* ── TOAST ───────────────────────────────────────── */
+        .toasts {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .75rem 1rem;
+            border-radius: var(--r);
+            border: 1px solid var(--bdr);
+            background: var(--bg2);
+            font-size: .85rem;
+            min-width: 240px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
+            animation: slideIn .3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(60px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        .toast.success {
+            border-color: rgba(16, 185, 129, .3);
+        }
+
+        .toast.error {
+            border-color: rgba(239, 68, 68, .3);
+        }
+
+        /* ── FORM GRID ───────────────────────────────────── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media(max-width:720px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modes .mode {
+                min-width: 100px;
+            }
+
+            .sidebar {
+                display: none;
+            }
+        }
+    </style>
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="nav">
+        <a href="index.html" class="logo">
+            <div class="logo-mark">🧠</div>
+            <span class="logo-text">Resum<span>AI</span></span>
+        </a>
+        <div class="nav-links">
+            <a href="jobs.html" class="btn btn-ghost">🔍 Jobs</a>
+            <a href="resume-builder.html" class="btn btn-ghost">📝 Builder</a>
+            <a href="analytics.html" class="btn btn-ghost">📊 Analytics</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"><span
+                    class="theme-icon">🌙</span></button>
+        </div>
+    </nav>
+
+    <!-- LAYOUT -->
+    <div class="layout">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="slabel">Workspace</div>
+            <a href="dashboard.html" class="slink active">🎯 ATS Analyzer</a>
+            <a href="jobs.html" class="slink">🔍 Job Search</a>
+            <a href="resume-builder.html" class="slink">📝 Resume Builder</a>
+            <a href="analysis.html" class="slink">📈 Last Results</a>
+            <a href="analytics.html" class="slink">📊 Analytics</a>
+            <div class="sdiv"></div>
+            <div class="slabel">How It Works</div>
+            <div style="padding:.4rem 1rem 0;font-size:.77rem;color:var(--fg3);line-height:1.65;">
+                Your resume text is compared to the JD using TF-IDF keyword overlap + cosine similarity. Every unique
+                resume + JD pair gives a different score.
+            </div>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="main">
+
+            <div style="margin-bottom:1.5rem;">
+                <h1 style="margin-bottom:.3rem;">AI Resume Analyzer</h1>
+                <p style="color:var(--fg2);font-size:.9rem;">Upload or paste your resume → pick a job → get a unique,
+                    real ATS score.</p>
+            </div>
+
+            <!-- MODES -->
+            <div class="modes">
+                <div class="mode on" onclick="pickMode(this,'full')">
+                    <div class="mode-icon">🎯</div>
+                    <div class="mode-label">Full Analysis</div>
+                </div>
+                <div class="mode" onclick="pickMode(this,'score')">
+                    <div class="mode-icon">📊</div>
+                    <div class="mode-label">ATS Score</div>
+                </div>
+                <div class="mode" onclick="pickMode(this,'bullets')">
+                    <div class="mode-icon">⚡</div>
+                    <div class="mode-label">Optimize Bullets</div>
+                </div>
+                <div class="mode" onclick="pickMode(this,'interview')">
+                    <div class="mode-icon">💬</div>
+                    <div class="mode-label">Interview Prep</div>
+                </div>
+            </div>
+
+            <!-- MAIN FORM CARD -->
+            <div class="card" style="margin-bottom:1.5rem;">
+
+                <!-- Error banner (hidden by default) -->
+                <div class="err-banner" id="errBanner">⛔ <span id="errMsg">Please upload or paste your resume
+                        first.</span></div>
+
+                <div class="form-grid">
+
+                    <!-- LEFT: Resume -->
+                    <div>
+                        <label class="lbl">📄 Step 1 — Your Resume <span class="req">*required</span></label>
+                        <div class="tab-row">
+                            <button class="tab-btn on" id="tUp" onclick="switchTab('up')">📎 Upload
+                                PDF/DOCX/TXT</button>
+                            <button class="tab-btn" id="tPaste" onclick="switchTab('paste')">📝 Paste Text</button>
+                        </div>
+
+                        <!-- Upload -->
+                        <div id="secUp">
+                            <input type="file" id="fileIn" accept=".pdf,.docx,.txt" style="display:none">
+                            <div class="drop" id="dropZ" onclick="fileIn.click()">
+                                <div class="drop-icon" id="dropIcon">📄</div>
+                                <div class="drop-title" id="dropTitle">Drop file here or click to upload</div>
+                                <div class="drop-sub" id="dropSub">PDF, DOCX or TXT · Max 10 MB</div>
+                            </div>
+                            <div class="status-strip" id="strip"><span id="stripMsg"></span></div>
+                        </div>
+
+                        <!-- Paste -->
+                        <div id="secPaste" style="display:none;">
+                            <textarea id="pasteTxt" rows="10" placeholder="Paste your full resume text here…
+
+Include all sections: Skills, Experience, Education, Projects, Certifications.
+
+The more detail you include, the more accurate your ATS score."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Job -->
+                    <div style="display:flex;flex-direction:column;gap:.85rem;">
+                        <div>
+                            <label class="lbl">💼 Step 2 — Target Job</label>
+                            <select id="jobDrop" onchange="loadJD(this.value)" style="margin-bottom:.65rem;">
+                                <option value="">🔽 Choose a job template (or paste below)</option>
+                                <optgroup label="🏢 Software Engineering">
+                                    <option value="swe_backend">Backend Engineer (Python / Go)</option>
+                                    <option value="swe_frontend">Frontend Engineer (React / TS)</option>
+                                    <option value="swe_fullstack">Full Stack Engineer</option>
+                                    <option value="swe_mobile">Mobile Engineer (iOS / Android)</option>
+                                    <option value="swe_platform">Platform / Infra Engineer</option>
+                                </optgroup>
+                                <optgroup label="🤖 AI / ML / Data">
+                                    <option value="ml_engineer">Machine Learning Engineer</option>
+                                    <option value="data_scientist">Data Scientist</option>
+                                    <option value="ai_researcher">AI / LLM Research Scientist</option>
+                                    <option value="data_engineer">Data Engineer (dbt / Spark)</option>
+                                    <option value="mlops">MLOps / AI Infra Engineer</option>
+                                    <option value="nlp_engineer">NLP Engineer</option>
+                                </optgroup>
+                                <optgroup label="☁️ Cloud / DevOps">
+                                    <option value="devops">DevOps / SRE</option>
+                                    <option value="cloud_arch">Cloud Architect (AWS/GCP/Azure)</option>
+                                    <option value="security">AppSec / Security Engineer</option>
+                                </optgroup>
+                                <optgroup label="📋 Product / Design">
+                                    <option value="pm">Product Manager</option>
+                                    <option value="apm">Associate Product Manager</option>
+                                    <option value="ux">UX / Product Designer</option>
+                                </optgroup>
+                                <optgroup label="📊 Analytics">
+                                    <option value="analytics_eng">Analytics Engineer</option>
+                                    <option value="bi_analyst">BI Analyst</option>
+                                    <option value="quant">Quantitative Analyst</option>
+                                </optgroup>
+                                <optgroup label="🌐 Other">
+                                    <option value="blockchain">Blockchain / Web3 Developer</option>
+                                    <option value="game_dev">Game Developer</option>
+                                    <option value="robotics">Robotics Engineer</option>
+                                </optgroup>
+                            </select>
+                            <textarea id="jdTxt" rows="8"
+                                placeholder="…or paste the full job description here for the most accurate score.&#10;&#10;Include requirements, responsibilities, and the complete posting."></textarea>
+                        </div>
+                        <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+                            <span class="badge badge-blue" onclick="quickLoad('swe_backend')">🔧 SWE Sample</span>
+                            <span class="badge badge-purple" onclick="quickLoad('ml_engineer')">🤖 ML Sample</span>
+                            <span class="badge badge-pink" onclick="quickLoad('pm')">📋 PM Sample</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+                    <div class="opt-row">
+                        <label><input type="checkbox" id="optCover" checked> Cover Letter</label>
+                        <label><input type="checkbox" id="optInterview" checked> Interview Prep</label>
+                        <label><input type="checkbox" id="optBullets" checked> Bullet Optimizer</label>
+                    </div>
+                    <button class="btn btn-primary btn-lg" onclick="runAnalysis()">🚀 Analyze Resume</button>
+                </div>
+            </div>
+
+            <!-- RECENT HISTORY -->
+            <h2 style="margin-bottom:1rem;">Recent Analyses</h2>
+            <div class="hist" onclick="location='analysis.html'">
+                <div style="display:flex;align-items:center;gap:.8rem;">
+                    <div
+                        style="width:36px;height:36px;background:var(--glass2);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+                        📄</div>
+                    <div>
+                        <div class="hist-file">SWE_Resume_v3.pdf</div>
+                        <div class="hist-sub">vs Google L5 · 2 h ago</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:.7rem;">
+                    <span
+                        style="font-weight:700;font-size:1rem;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">82%</span>
+                    <span style="font-size:.77rem;font-weight:600;color:var(--green);">Strong</span>
+                </div>
+            </div>
+            <div class="hist" onclick="location='analysis.html'">
+                <div style="display:flex;align-items:center;gap:.8rem;">
+                    <div
+                        style="width:36px;height:36px;background:var(--glass2);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+                        📄</div>
+                    <div>
+                        <div class="hist-file">Resume_PM_v1.docx</div>
+                        <div class="hist-sub">vs Meta APM · Yesterday</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:.7rem;">
+                    <span style="font-weight:700;font-size:1rem;color:var(--yellow);">64%</span>
+                    <span style="font-size:.77rem;font-weight:600;color:var(--yellow);">Fair</span>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- PROCESSING OVERLAY -->
+    <div class="proc-overlay" id="procOverlay">
+        <div class="proc-box">
+            <div class="proc-icon">🧠</div>
+            <h2 style="margin-bottom:.25rem;">Analyzing…</h2>
+            <p class="proc-msg" id="procMsg">Starting analysis…</p>
+            <div class="dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <div class="pbar-wrap">
+                <div class="pbar" id="pbar"></div>
+            </div>
+            <div class="pbar-row"><span id="pStep">Loading…</span><span id="pPct">0%</span></div>
+        </div>
+    </div>
+
+    <!-- TOASTS -->
+    <div class="toasts" id="toastBox"></div>
+
+    <!-- SCRIPTS -->
+    <script src="js/scorer.js"></script>
+    <script>
+        // ── pdf.js setup ─────────────────────────────────────────────────────────
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        // ── State ─────────────────────────────────────────────────────────────────
+        let extractedText = '';   // text from uploaded file
+        let analysisMode = 'full';
+
+        // Always clear stale stored resume on load
+        localStorage.removeItem('resumeText');
+
+        // ── Toast ─────────────────────────────────────────────────────────────────
+        function toast(icon, msg, type = 'info') {
+            const box = document.getElementById('toastBox');
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            el.innerHTML = `<span style="font-size:1.1rem">${icon}</span><span>${msg}</span>`;
+            box.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(60px)'; el.style.transition = '.4s'; setTimeout(() => el.remove(), 400); }, 4000);
+        }
+
+        // ── Mode picker ───────────────────────────────────────────────────────────
+        function pickMode(el, m) {
+            document.querySelectorAll('.mode').forEach(c => c.classList.remove('on'));
+            el.classList.add('on'); analysisMode = m;
+        }
+
+        // ── Tab toggle ────────────────────────────────────────────────────────────
+        function switchTab(t) {
+            const isUp = t === 'up';
+            document.getElementById('secUp').style.display = isUp ? '' : 'none';
+            document.getElementById('secPaste').style.display = isUp ? 'none' : '';
+            document.getElementById('tUp').className = 'tab-btn' + (isUp ? ' on' : '');
+            document.getElementById('tPaste').className = 'tab-btn' + (isUp ? '' : ' on');
+        }
+
+        // ── Drag and drop ─────────────────────────────────────────────────────────
+        const dropZ = document.getElementById('dropZ');
+        ['dragenter', 'dragover'].forEach(ev => dropZ.addEventListener(ev, e => { e.preventDefault(); dropZ.classList.add('over'); }));
+        ['dragleave', 'drop'].forEach(ev => dropZ.addEventListener(ev, e => { e.preventDefault(); dropZ.classList.remove('over'); }));
+        dropZ.addEventListener('drop', e => readFile(e.dataTransfer.files[0]));
+        document.getElementById('fileIn').addEventListener('change', e => readFile(e.target.files[0]));
+
+        // ── File reading ──────────────────────────────────────────────────────────
+        async function readFile(file) {
+            if (!file) return;
+            const strip = document.getElementById('strip');
+            const msg = document.getElementById('stripMsg');
+            document.getElementById('dropIcon').textContent = '⏳';
+            document.getElementById('dropTitle').textContent = file.name;
+            document.getElementById('dropSub').textContent = (file.size / 1024).toFixed(0) + ' KB · Reading…';
+            strip.className = 'status-strip';
+            try {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (ext === 'txt') {
+                    extractedText = await file.text();
+                } else if (ext === 'pdf') {
+                    if (typeof pdfjsLib === 'undefined') throw new Error('PDF library not loaded. Try refreshing.');
+                    const ab = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+                    let t = '';
+                    for (let p = 1; p <= pdf.numPages; p++) {
+                        const pg = await pdf.getPage(p);
+                        const tc = await pg.getTextContent();
+                        t += tc.items.map(i => i.str).join(' ') + '\n';
+                    }
+                    extractedText = t;
+                } else if (ext === 'docx') {
+                    const ab = await file.arrayBuffer();
+                    const raw = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(ab));
+                    const txt = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                    extractedText = txt.split(' ').filter(w => /^[\x20-\x7E]+$/.test(w) && w.length > 1).join(' ');
+                    if (extractedText.length < 80) throw new Error('Could not extract DOCX text. Please use Paste Text tab.');
+                } else {
+                    throw new Error('Unsupported file type. Use PDF, DOCX, or TXT.');
+                }
+                const wc = extractedText.split(/\s+/).length;
+                document.getElementById('dropIcon').textContent = '✅';
+                document.getElementById('dropSub').textContent = (file.size / 1024).toFixed(0) + ' KB · ' + wc + ' words extracted';
+                strip.className = 'status-strip ok';
+                msg.textContent = '✅ ' + wc + ' words extracted — ready to analyze!';
+                toast('✅', 'Resume extracted! Scoring will be accurate.', 'success');
+            } catch (err) {
+                document.getElementById('dropIcon').textContent = '⚠️';
+                strip.className = 'status-strip err';
+                msg.textContent = err.message;
+                toast('⚠️', err.message, 'error');
+            }
+        }
+
+        // ── JD Templates ─────────────────────────────────────────────────────────
+        const JD = {
+            swe_backend: `Backend Software Engineer — Google L5\n\nResponsibilities:\n- Design and build highly scalable backend services in Python or Go\n- Architect distributed systems handling millions of daily requests\n- Work with Kubernetes, Docker, GCP\n\nRequired Skills:\nPython, Go, microservices, Docker, Kubernetes, CI/CD, PostgreSQL, Redis, AWS, GCP, REST APIs, gRPC, system design, distributed systems`,
+            swe_frontend: `Frontend Engineer — Meta\n\nRequired Skills:\nReact, TypeScript, JavaScript, CSS, HTML, Next.js, GraphQL, Webpack, Vite, accessibility, Core Web Vitals, Figma, performance optimization`,
+            swe_fullstack: `Full Stack Engineer — Stripe\n\nRequired Skills:\nNode.js, Python, React, TypeScript, PostgreSQL, Redis, REST APIs, OAuth, security, CI/CD, Git, microservices`,
+            swe_mobile: `Mobile Engineer — Apple\n\nRequired Skills:\nSwift, SwiftUI, UIKit, Xcode, ARKit, CoreML, CoreData, iOS, App Store, mobile development`,
+            swe_platform: `Platform Engineer — Airbnb\n\nRequired Skills:\nKubernetes, Terraform, AWS, GCP, Python, Go, Prometheus, Grafana, Docker, CI/CD, infrastructure`,
+            ml_engineer: `Machine Learning Engineer — OpenAI\n\nRequired Skills:\nPython, PyTorch, TensorFlow, machine learning, deep learning, LLMs, transformer, RLHF, distributed training, MLOps, MLflow, Docker, Kubernetes, NLP, embeddings, fine-tuning`,
+            data_scientist: `Data Scientist — Netflix\n\nRequired Skills:\nPython, SQL, R, statistics, A/B testing, causal inference, pandas, NumPy, scikit-learn, Spark, dbt, Tableau, machine learning`,
+            ai_researcher: `AI Research Scientist — Anthropic\n\nRequired Skills:\nPyTorch, JAX, Python, machine learning, transformers, NLP, alignment, RLHF, LLMs, research, statistics, deep learning`,
+            data_engineer: `Data Engineer — Snowflake\n\nRequired Skills:\ndbt, Apache Spark, Airflow, SQL, Python, Snowflake, BigQuery, Redshift, ETL, data modeling, data lake`,
+            mlops: `MLOps Engineer — Databricks\n\nRequired Skills:\nMLflow, Kubeflow, Kubernetes, Docker, Python, SQL, Spark, CI/CD, model deployment, monitoring, data drift`,
+            nlp_engineer: `NLP Engineer — Cohere\n\nRequired Skills:\nPython, NLP, HuggingFace, PyTorch, transformers, fine-tuning, LLMs, LoRA, RAG, ChromaDB, Pinecone, LangChain, embeddings`,
+            devops: `DevOps / SRE — GitHub\n\nRequired Skills:\nKubernetes, Helm, Docker, Terraform, Ansible, AWS, GCP, GitHub Actions, Jenkins, CI/CD, Prometheus, Grafana, Linux, Bash, Python`,
+            cloud_arch: `Cloud Architect — AWS\n\nRequired Skills:\nAWS, EC2, EKS, S3, RDS, Lambda, Terraform, CDK, microservices, serverless, security, IAM, cost optimization`,
+            security: `AppSec Engineer — Cloudflare\n\nRequired Skills:\npenetration testing, SAST, DAST, OWASP, OAuth, JWT, IAM, Python, Go, vulnerability assessment, security auditing`,
+            pm: `Product Manager — Google\n\nRequired Skills:\nproduct strategy, roadmap, SQL, A/B testing, analytics, stakeholder management, Agile, Scrum, Jira, user research, metrics, KPIs`,
+            apm: `Associate Product Manager — Meta\n\nRequired Skills:\nSQL, data analysis, communication, user research, A/B testing, product sense, Agile, metrics`,
+            ux: `UX Designer — Figma\n\nRequired Skills:\nFigma, UX design, user research, usability testing, wireframing, prototyping, accessibility, WCAG, design systems`,
+            analytics_eng: `Analytics Engineer — dbt Labs\n\nRequired Skills:\nSQL, dbt, Python, Snowflake, BigQuery, Redshift, dimensional modeling, data warehouse, Git, CI/CD`,
+            bi_analyst: `BI Analyst — Spotify\n\nRequired Skills:\nSQL, Tableau, Looker, Power BI, Python, A/B testing, statistics, data visualization, reporting`,
+            quant: `Quantitative Analyst — Jane Street\n\nRequired Skills:\nPython, C++, statistics, probability, stochastic calculus, financial markets, time series, machine learning, alpha research`,
+            blockchain: `Blockchain Developer — Coinbase\n\nRequired Skills:\nSolidity, Ethereum, Web3.js, Ethers.js, DeFi, smart contracts, Rust, Solana, cryptography, security`,
+            game_dev: `Game Developer — Epic Games\n\nRequired Skills:\nUnreal Engine, C++, Blueprints, 3D math, multiplayer networking, game server, physics, performance optimization`,
+            robotics: `Robotics Engineer — Boston Dynamics\n\nRequired Skills:\nC++, Python, ROS, ROS2, motion planning, SLAM, perception, real-time control, computer vision, embedded systems`,
+        };
+
+        function loadJD(k) { if (k && JD[k]) { document.getElementById('jdTxt').value = JD[k]; toast('📋', 'Job description loaded!', 'info'); } }
+        function quickLoad(k) { document.getElementById('jobDrop').value = k; loadJD(k); }
+
+        // ── Main Analysis ─────────────────────────────────────────────────────────
+        function runAnalysis() {
+            const jd = document.getElementById('jdTxt').value.trim();
+            const pasteText = document.getElementById('pasteTxt').value.trim();
+            const resumeText = pasteText || extractedText;
+            const banner = document.getElementById('errBanner');
+            const msg = document.getElementById('errMsg');
+
+            // Validate JD
+            if (!jd) {
+                msg.textContent = 'Please paste or select a job description first.';
+                banner.classList.add('show');
+                const jdEl = document.getElementById('jdTxt');
+                jdEl.style.borderColor = 'var(--red)';
+                setTimeout(() => jdEl.style.borderColor = '', 1500);
+                toast('⚠️', 'Please add a job description.', 'error');
+                return;
+            }
+
+            // Validate resume
+            if (!resumeText || resumeText.length < 50) {
+                msg.textContent = 'Upload your resume or paste its text — analysis cannot run without resume content.';
+                banner.classList.add('show');
+                // Shake the drop zone and paste area
+                dropZ.style.borderColor = 'var(--red)';
+                setTimeout(() => dropZ.style.borderColor = '', 1500);
+                document.getElementById('uploadSection');
+                toast('⛔', 'Please provide your resume first.', 'error');
+                // Switch to upload tab so user sees the issue
+                switchTab('up');
+                window.scrollTo({ top: 200, behavior: 'smooth' });
+                return;
+            }
+
+            banner.classList.remove('show');
+
+            // Store and compute score
+            localStorage.setItem('resumeText', resumeText);
+            const result = (typeof computeATSScore === 'function')
+                ? computeATSScore(resumeText, jd)
+                : { total: 0, error: 'Scorer not loaded' };
+            localStorage.setItem('atsResult', JSON.stringify({ ...result, jd, resumeWords: resumeText.split(/\s+/).length }));
+
+            // Show progress overlay
+            const overlay = document.getElementById('procOverlay');
+            overlay.classList.add('show');
+
+            const steps = [
+                [12, 'Tokenizing resume text…'],
+                [28, 'Extracting technical keywords…'],
+                [46, 'Building TF-IDF vectors…'],
+                [63, 'Computing cosine similarity…'],
+                [78, 'Scoring experience & format signals…'],
+                [91, 'Generating recommendations…'],
+                [100, 'Finalizing report…'],
+            ];
+            let i = 0;
+            const tick = setInterval(() => {
+                if (i >= steps.length) { clearInterval(tick); setTimeout(() => { window.location.href = 'analysis.html'; }, 400); return; }
+                const [pct, stepMsg] = steps[i++];
+                document.getElementById('pbar').style.width = pct + '%';
+                document.getElementById('pPct').textContent = pct + '%';
+                document.getElementById('procMsg').textContent = stepMsg;
+                document.getElementById('pStep').textContent = stepMsg;
+            }, 480);
+        }
+    </script>
+</body>
+
+</html>
