@@ -1,0 +1,226 @@
+--- PAGE 1 ---
+Question
+When starting a project in a technology stack you have never used before, what is your
+typical first step?
+Options
+A. Read official documentation and architecture guides first
+B. Build a small prototype to experiment with the technology
+C. Watch tutorials or study existing open-source projects
+D. Ask experienced teammates for recommended best practices
+Trait Signals
+A → LearningAgility +0.8, ResearchEfficiency +0.9
+B → LearningAgility +0.7, AnalyticalDecisionMaking +0.5
+C → LearningAgility +0.6
+D → CollaborationStyle +0.7
+2. Handling a production bug
+Question
+A critical production bug begins affecting users. What is your first action?
+Options
+A. Roll back the latest deployment to restore service
+B. Analyze logs and traces to identify the root cause
+C. Deploy a quick patch to reduce user impact immediately
+D. Attempt to reproduce the issue in a staging environment
+Traits
+A → IncidentManagement +0.7
+B → DebuggingDepth +0.9
+C → SystemSustainability +0.6
+D → DebuggingDepth +0.7
+3. Managing technical debt
+Question
+How should technical debt be handled in a fast-paced development team?
+Options
+A. Focus on shipping features and address debt only when necessary
+B. Allocate time in every sprint specifically for refactoring
+
+--- PAGE 2 ---
+C. Refactor code whenever you modify an existing component
+D. Plan periodic engineering cleanup cycles
+Traits
+A → TechnicalDebtStrategy +0.4
+B → SystemSustainability +0.8
+C → TechnicalDebtStrategy +0.7
+D → SystemSustainability +0.7
+4. Applying for a role with an unfamiliar tool
+Question
+A job description lists a tool you have never used before. How do you approach the
+opportunity?
+Options
+A. Explain transferable skills and willingness to learn quickly
+B. Build a small project using the tool before the interview
+C. Study the tool’s ecosystem and architecture beforehand
+D. Avoid applying until you gain formal experience
+Traits
+A → SelfAwareness +0.7
+B → Adaptability +0.8
+C → ResearchEfficiency +0.7
+D → SelfAwareness +0.4
+5. Priorities during code review
+Question
+When reviewing a teammate's code, what do you look for first?
+Options
+A. Logical correctness and potential bugs
+B. Code readability and maintainability
+C. Performance bottlenecks or inefficiencies
+D. Security vulnerabilities
+Traits
+A → CodeQualityFocus +0.8
+B → SystemSustainability +0.8
+
+--- PAGE 3 ---
+C → TradeoffReasoning +0.7
+D → SecurityAwareness +0.9
+6. Feature impacting performance
+Question
+A client requests a feature that will slow the system by about 40%. What would you do?
+Options
+A. Implement it because it is technically feasible
+B. Explain the performance trade-off and propose alternatives
+C. Implement it while optimizing other parts of the system
+D. Escalate the decision to product leadership
+Traits
+A → StakeholderCommunication +0.3
+B → TradeoffReasoning +0.9
+C → ArchitectureThinking +0.6
+D → StakeholderCommunication +0.6
+7. Architecture preference
+Question
+Which system architecture do you generally find most robust for scalable applications?
+Options
+A. Modular monolith architecture
+B. Microservices architecture
+C. Serverless architecture
+D. Event-driven distributed architecture
+Traits
+A → ArchitectureThinking +0.5
+B → ArchitectureThinking +0.8
+C → ArchitectureThinking +0.6
+D → ArchitectureThinking +0.9
+
+--- PAGE 4 ---
+8. Unrealistic deadlines
+Question
+You realize halfway through a project that the deadline cannot realistically be met.
+Options
+A. Inform stakeholders immediately and propose revised estimates
+B. Work extra hours to try meeting the deadline
+C. Reduce feature scope quietly to finish on time
+D. Wait until closer to the deadline before raising concerns
+Traits
+A → Accountability +0.9
+B → Ownership +0.6
+C → CommunicationTransparency +0.2
+D → Accountability +0.3
+9. Ideal role balance
+Question
+In your ideal engineering role, how would your time be distributed?
+Options
+A. Mostly coding and implementing features
+B. Balanced between coding and architecture decisions
+C. Mostly system design and architecture
+D. Leading technical strategy and mentoring engineers
+Traits
+A → CareerOrientation +0.4
+B → CareerOrientation +0.6
+C → LeadershipMaturity +0.6
+D → LeadershipMaturity +0.9
+10. Security vulnerability discovery
+Question
+You discover a security vulnerability in a module unrelated to your current task.
+Options
+A. Fix the vulnerability immediately
+B. Report the issue and create a ticket
+
+--- PAGE 5 ---
+C. Inform the team and suggest potential solutions
+D. Ignore it because it is outside your task scope
+Traits
+A → Ownership +0.9
+B → SecurityResponsibility +0.7
+C → Ownership +0.7
+D → Ownership +0.1
+11. Privacy regulation pressure
+Question
+Your team leader suggests ignoring a minor privacy regulation during testing.
+Options
+A. Follow instructions because it is only for testing
+B. Express concern and recommend compliance
+C. Escalate the issue to appropriate leadership
+D. Refuse to proceed until the issue is resolved
+Traits
+A → Integrity +0.1
+B → ComplianceAwareness +0.8
+C → Integrity +0.9
+D → Integrity +1.0
+12. Technical disagreement
+Question
+You disagree with a teammate about a technical design decision.
+Options
+A. Present benchmarks or data supporting your argument
+B. Ask a senior engineer to mediate
+C. Build small prototypes to compare both approaches
+D. Accept the teammate's decision to avoid conflict
+Traits
+A → AnalyticalDecisionMaking +0.8
+B → CollaborationStyle +0.6
+C → AnalyticalDecisionMaking +0.9
+D → CollaborationStyle +0.4
+
+--- PAGE 6 ---
+13. Accessibility in UI design
+Question
+When designing a user interface, how do you approach accessibility standards?
+Options
+A. Only address accessibility when required
+B. Follow accessibility guidelines during development
+C. Include accessibility checks in testing and QA
+D. Prioritize inclusive design from the beginning
+Traits
+A → UXEmpathy +0.2
+B → InclusiveDesign +0.7
+C → InclusiveDesign +0.8
+D → InclusiveDesign +1.0
+14. Handling project failure
+Question
+A project you led fails after deployment. What is your primary focus in the post-mortem?
+Options
+A. Identifying technical causes of failure
+B. Improving engineering processes and workflows
+C. Understanding team decision-making errors
+D. Restoring system stability and reliability
+Traits
+A → ProcessMaturity +0.6
+B → ProcessMaturity +0.9
+C → LeadershipMaturity +0.6
+D → Resilience +0.7
+
+--- PAGE 7 ---
+15. Senior vs junior engineers
+Question
+What primarily differentiates a senior engineer from a junior engineer?
+Options
+A. Experience with more technologies
+B. Ability to design scalable systems
+C. Ownership of complex problems
+D. Mentoring others and guiding technical decisions
+Traits
+A → LeadershipMaturity +0.3
+B → ArchitectureThinking +0.7
+C → Ownership +0.8
+D → LeadershipMaturity +0.9
+Trait Calculation
+from collections import defaultdict
+def compute_trait_scores(answers, mapping):
+trait_scores = defaultdict(float)
+trait_counts = defaultdict(int)
+for qid, option in answers.items():
+traits = mapping[qid][option]
+for trait, weight in traits.items():
+trait_scores[trait] += weight
+trait_counts[trait] += 1
+
+--- PAGE 8 ---
+normalized = {}
+for trait in trait_scores:
+normalized[trait] = trait_scores[trait] / trait_counts[trait]
+return normalized
+
